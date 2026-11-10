@@ -1,0 +1,4 @@
+exit=1
+ids=UI003
+args=--skip-tsc --dirs packages/design
+output=FAIL UI003 packages/design/components/ui/badge.tsx:2

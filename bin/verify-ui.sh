@@ -202,8 +202,8 @@ TOAST_RE="${B}toast(\\.[A-Za-z]+)?[[:space:]]*\\("
 # A line that only defines a toast helper (function toast(, const toast =) is not a toast call.
 TOAST_DEF_RE="(function|const|let|var)[[:space:]]+toast[[:space:]]*[(=:]"
 LIBIMPORT_RE="(from|import)[[:space:]]*${Q}(motion/react|vaul|cmdk|@number-flow/react|next-themes)${Q}"
-# "document. Then" is prose; a property access needs a name after the dot.
-BROWSER_RE="${B}(window|document)\\.[A-Za-z_\$]|${B}localStorage([^A-Za-z0-9_\$]|\$)"
+# "document. Then" is prose; a property access needs a name after the dot. matchMedia counts only as a call.
+BROWSER_RE="${B}(window|document|navigator)\\.[A-Za-z_\$]|${B}(localStorage|sessionStorage)([^A-Za-z0-9_\$]|\$)|${B}matchMedia[[:space:]]*\\("
 ONPROP_RE="[[:space:]]on[A-Z][A-Za-z0-9]*=\\{"
 # A one-line <Component onX={name}> passes a server action or plain data; only an arrow or function value is client-only.
 # shortcut: tags split over several lines are still flagged; use the pragma for those.
@@ -213,7 +213,7 @@ COMPONENT_PROP_RE="<[A-Z][A-Za-z0-9._]*[[:space:]][^<]*on[A-Z][A-Za-z0-9]*=\\{[^
 FUNC_PROP_RE="on[A-Z][A-Za-z0-9]*=\\{[[:space:]]*(async[[:space:]]+)?(function([[:space:]]|\\()|\\([^)]*\\)[[:space:]]*(:[^=]*)?=>|[A-Za-z_\$][A-Za-z0-9_\$]*[[:space:]]*=>)"
 STRONG_RE="${HOOK_RE}|${TOAST_RE}|${LIBIMPORT_RE}"
 # on* props only mean something in JSX files. Browser globals count in every file unless the file tests
-# typeof window/document/localStorage somewhere (see check_ui001): such a module is written to run on the server too.
+# typeof window/document/navigator/localStorage/sessionStorage/matchMedia somewhere (see check_ui001): such a module is written to run on the server too.
 
 # has_use_client FILE: first statement, after blank lines and comments, is a 'use client' directive.
 has_use_client() {
@@ -245,7 +245,7 @@ check_ui001() {
     case $f in "$BASE/pages/"*|*.d.ts|*.test.*|*.spec.*|*.stories.*|*/__tests__/*) continue ;; esac
     has_use_client "$f" && continue
     # shortcut: one typeof guard anywhere exempts the whole file from the browser-global check (hooks and imports still count).
-    if grep -qE 'typeof[[:space:]]+(window|document|localStorage)' -- "$f"; then bro=""; else bro="|${BROWSER_RE}"; fi
+    if grep -qE 'typeof[[:space:]]+(window|document|navigator|localStorage|sessionStorage|matchMedia)' -- "$f"; then bro=""; else bro="|${BROWSER_RE}"; fi
     case $f in
       *.tsx|*.jsx) re="${STRONG_RE}${bro}|${ONPROP_RE}"; strong="${STRONG_RE}${bro}" ;;
       *) re="${STRONG_RE}${bro}"; strong=$re ;;

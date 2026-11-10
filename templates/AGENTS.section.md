@@ -3,7 +3,7 @@
 
 Do not ship generic AI-looking UI. The gate is `bash scripts/verify-ui.sh`; run it before presenting UI work. The skill `kirby-anti-ai-ui-architect` holds the full rules and the routing table.
 
-- Client boundaries: a file that uses hooks, `on*` handlers, `window`, `document`, `localStorage`, `toast(`, or imports `motion/react`, `vaul`, `cmdk`, `@number-flow/react` or `next-themes` starts with `'use client'` as its first statement. Server files use `motion/react-client`.
+- Client boundaries: a file that uses hooks, `on*` handlers, `window`, `document`, `navigator`, `localStorage`, `sessionStorage`, `matchMedia(`, `toast(`, or imports `motion/react`, `vaul`, `cmdk`, `@number-flow/react` or `next-themes` starts with `'use client'` as its first statement. Server files use `motion/react-client`.
 - One animation runtime: `motion`. Never add `framer-motion`, `gsap`, `lottie-*`, `react-spring` or `@react-spring/*`.
 - Colour: semantic tokens only (`bg-background`, `bg-card`, `bg-muted`). No raw `bg-zinc-900`, `bg-slate-800` and friends outside `components/ui/`.
 - Radius: set the project's own `--radius`. Never leave the shadcn default (`0.5rem` or `0.625rem`).
