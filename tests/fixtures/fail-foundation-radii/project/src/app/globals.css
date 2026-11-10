@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 0.2rem;
+  --background: oklch(0.99 0.004 85);
+  --foreground: oklch(0.22 0.02 260);
+}
+
+/* copied from the Beautiful UI foundation style */
+@theme {
+  --radius-chip: 6px;
+  --radius-control: 8px;
+  --radius-card: 10px;
+  --radius-window: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

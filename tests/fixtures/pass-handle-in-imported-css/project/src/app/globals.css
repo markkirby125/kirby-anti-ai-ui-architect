@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+:root {
+  --radius: 0.2rem;
+}

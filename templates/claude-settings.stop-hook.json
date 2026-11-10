@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null || exit 0; in=$(cat); echo \"$in\" | grep -Eq '\"stop_hook_active\"[[:space:]]*:[[:space:]]*true' && exit 0; [ -f scripts/verify-ui.sh ] || exit 0; out=$(bash scripts/verify-ui.sh --skip-tsc 2>&1); rc=$?; if [ \"$rc\" -eq 1 ]; then echo \"$out\" >&2; exit 2; fi; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

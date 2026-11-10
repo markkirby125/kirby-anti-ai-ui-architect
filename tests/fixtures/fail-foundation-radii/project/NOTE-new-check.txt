@@ -1,0 +1,6 @@
+UI007 is a NEW check, not in the plan's section 6 table.
+Rule: leftover Beautiful UI foundation radii (--radius-chip, --radius-control,
+--radius-card, --radius-window) in the global CSS conflict with the single brand
+--radius. Source: plan section 12, decision 1(b).
+Scope: global CSS only. This fixture's --radius is non-default (0.2rem), so UI005
+must not fire; only UI007 is expected.

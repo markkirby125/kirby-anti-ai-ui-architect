@@ -1,0 +1,3 @@
+exit=1
+ids=UI005
+args=--skip-tsc

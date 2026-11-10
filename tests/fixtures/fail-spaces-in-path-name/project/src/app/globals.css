@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 0.2rem;
+  --background: oklch(0.99 0.004 85);
+  --foreground: oklch(0.22 0.02 260);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

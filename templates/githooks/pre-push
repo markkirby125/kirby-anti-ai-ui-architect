@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# pre-push: run the full UI gate (including tsc) before a push.
+# Installed to .githooks/pre-push; enabled by: git config core.hooksPath .githooks
+# Skipped by git push --no-verify. Only CI closes that gap.
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root" || exit 0
+[ -f scripts/verify-ui.sh ] || exit 0
+bash scripts/verify-ui.sh
+rc=$?
+if [ "$rc" -ne 0 ]; then
+  echo "pre-push: verify-ui failed (exit $rc). Fix the findings above, then push again." >&2
+  exit 1
+fi
+exit 0

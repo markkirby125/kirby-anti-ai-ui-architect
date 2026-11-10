@@ -1,0 +1,19 @@
+# Optional CI template for kirby-anti-ai-ui-architect. Copy to .github/workflows/verify-ui.yml.
+# CI is the only layer that git push --no-verify cannot skip.
+# Edit the install step to match the project's package manager (lockfile).
+name: verify-ui
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  verify-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: npm ci
+      - run: bash scripts/verify-ui.sh
+      - run: npx next build
