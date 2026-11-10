@@ -28,6 +28,7 @@ The rules a Next.js + React + Tailwind + shadcn/ui project must hold. The target
 
 - If the project animates (imports `motion/react` or `motion/react-client`, writes `@keyframes`, uses an `animate-*` class other than `animate-spin`, `animate-pulse` or `animate-none`, runs `requestAnimationFrame`, renders `<canvas`), it needs a global handle: `prefers-reduced-motion` in a `*.css` file, a `motion-reduce:` or `motion-safe:` class, `useReducedMotion`, or `<MotionConfig reducedMotion="user">`.
 - Each file with `requestAnimationFrame` or `<canvas` also needs its own guard: `prefers-reduced-motion` (for example `matchMedia('(prefers-reduced-motion: reduce)')`) or `useReducedMotion`. A colour-scheme query does not count.
+- Files under `components/ui/` are shadcn-owned: their `animate-in` and `animate-out` classes are not flagged as the project's own animation. The per-file guard for `requestAnimationFrame` and `<canvas` still applies to them.
 
 ### R5. Radius (UI005, UI007)
 

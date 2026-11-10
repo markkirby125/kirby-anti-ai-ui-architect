@@ -50,11 +50,17 @@ Same snippet with `CLAUDE.md` and `templates/CLAUDE.section.md`. Then, only if `
 ```bash
 mkdir -p scripts
 SHA=$(git -C "<skill>" rev-parse --short HEAD)$([ -n "$(git -C "<skill>" status --porcelain)" ] && echo -dirty)
-sed "2s/.*/# skill-sha: $SHA/" "<skill>/bin/verify-ui.sh" > scripts/verify-ui.sh
-chmod +x scripts/verify-ui.sh
+NEW=$(mktemp)
+sed "2s/.*/# skill-sha: $SHA/" "<skill>/bin/verify-ui.sh" > "$NEW"
+if [ -f scripts/verify-ui.sh ] && ! cmp -s "$NEW" scripts/verify-ui.sh; then
+  diff -u scripts/verify-ui.sh "$NEW"
+  echo "scripts/verify-ui.sh differs: show this diff to the user and ask before replacing it (the new copy is in $NEW)" >&2
+else
+  cp "$NEW" scripts/verify-ui.sh && chmod +x scripts/verify-ui.sh && rm -f "$NEW"
+fi
 ```
 
-Line 2 of the script is the `skill-sha` header, so a later diff shows drift (see `04_verify.md`). If `scripts/verify-ui.sh` exists and differs, show the diff and ask before replacing it.
+The new copy goes to a temp file first, so an existing, hand-edited `scripts/verify-ui.sh` is never truncated before the user has seen the diff. On a yes, run `cp "$NEW" scripts/verify-ui.sh && chmod +x scripts/verify-ui.sh && rm -f "$NEW"`; on a no, `rm -f "$NEW"`. Line 2 of the script is the `skill-sha` header, so a later diff shows drift (see `04_verify.md`), and re-running after a skill update always asks once.
 
 ### 1d. Claude Code Stop hook
 

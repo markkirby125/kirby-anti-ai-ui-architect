@@ -1,0 +1,4 @@
+exit=0
+ids=
+args=-h
+output=Usage: bash verify-ui.sh

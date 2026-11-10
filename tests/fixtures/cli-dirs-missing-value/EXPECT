@@ -1,0 +1,4 @@
+exit=2
+ids=
+args=--dirs
+output=--dirs needs a value

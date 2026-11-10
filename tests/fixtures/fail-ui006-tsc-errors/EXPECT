@@ -1,0 +1,4 @@
+exit=1
+ids=UI006
+args=NONE
+output=src/app/page.tsx:2

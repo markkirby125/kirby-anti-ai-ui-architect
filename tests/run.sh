@@ -41,6 +41,8 @@ for dir in "$FIXTURES"/$PATTERN/; do
   exp_exit="$(sed -n 's/^exit=//p' "$expect_file" | head -n 1)"
   exp_ids="$(sed -n 's/^ids=//p' "$expect_file" | head -n 1 | norm_ids)"
   raw_args="$(sed -n 's/^args=//p' "$expect_file" | head -n 1)"
+  # Optional: text the gate output (stdout and stderr) must contain, for stderr notes and usage text.
+  exp_out="$(sed -n 's/^output=//p' "$expect_file" | head -n 1)"
   if [ -z "$exp_exit" ]; then
     echo "ERROR $case_name: EXPECT has no exit= line"
     errors=$((errors + 1))
@@ -70,11 +72,12 @@ for dir in "$FIXTURES"/$PATTERN/; do
   code=$?
   act_ids="$(printf '%s\n' "$out" | grep -oE '^FAIL UI[0-9]+' | awk '{print $2}' | sort -u | paste -sd, -)"
 
-  if [ "$code" = "$exp_exit" ] && [ "$act_ids" = "$exp_ids" ]; then
+  if [ "$code" = "$exp_exit" ] && [ "$act_ids" = "$exp_ids" ] \
+     && { [ -z "$exp_out" ] || printf '%s\n' "$out" | grep -qF -- "$exp_out"; }; then
     echo "PASS $case_name"
     passed=$((passed + 1))
   else
-    echo "FAIL $case_name: expected exit=$exp_exit ids=[$exp_ids], got exit=$code ids=[$act_ids]"
+    echo "FAIL $case_name: expected exit=$exp_exit ids=[$exp_ids]${exp_out:+ output~[$exp_out]}, got exit=$code ids=[$act_ids]"
     printf '%s\n' "$out" | head -n 10 | sed 's/^/    | /'
     failed=$((failed + 1))
   fi

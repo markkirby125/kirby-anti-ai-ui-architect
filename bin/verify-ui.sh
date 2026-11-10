@@ -88,6 +88,10 @@ if [ -d "$ROOT/app" ] || [ -d "$ROOT/pages" ]; then
   for d in components hooks lib; do
     [ -d "$ROOT/src/$d" ] && EXTRA+=("$ROOT/src/$d")
   done
+  # Next.js ignores src/app and src/pages when a root app/ or pages/ exists, so the gate does too; say so instead of passing silently.
+  if [ -d "$ROOT/src/app" ] || [ -d "$ROOT/src/pages" ]; then
+    echo "verify-ui: root app/ or pages/ exists, so Next.js ignores src/app and src/pages; they are not scanned" >&2
+  fi
 elif [ -d "$ROOT/src/app" ] || [ -d "$ROOT/src/pages" ] || [ -d "$ROOT/src/components" ]; then
   BASE=$ROOT/src
 fi
@@ -184,6 +188,8 @@ B='(^|[^A-Za-z0-9_$])'
 HOOKS='useState|useEffect|useLayoutEffect|useReducer|useRef|useContext|useTransition|useOptimistic|useActionState|useAnimate|useInView|useScroll|useSpring|useTransform|useMotionValue|useReducedMotion|useTheme|useRouter|usePathname|useSearchParams|useParams|useSelectedLayoutSegments?|useSyncExternalStore|useImperativeHandle|useDeferredValue|useInsertionEffect|useFormStatus|createContext'
 HOOK_RE="${B}(${HOOKS})[[:space:]]*[(<]"
 TOAST_RE="${B}toast(\\.[A-Za-z]+)?[[:space:]]*\\("
+# A line that only defines a toast helper (function toast(, const toast =) is not a toast call.
+TOAST_DEF_RE="(function|const|let|var)[[:space:]]+toast[[:space:]]*[(=:]"
 LIBIMPORT_RE="(from|import)[[:space:]]*${Q}(motion/react|vaul|cmdk|@number-flow/react|next-themes)${Q}"
 # "document. Then" is prose; a property access needs a name after the dot.
 BROWSER_RE="${B}(window|document)\\.[A-Za-z_\$]|${B}localStorage([^A-Za-z0-9_\$]|\$)"
@@ -235,6 +241,10 @@ check_ui001() {
     esac
     while IFS= read -r m; do
       line=${m#*:}
+      if [[ $line =~ $TOAST_DEF_RE ]]; then
+        rest=$(printf '%s\n' "$line" | sed -E "s/$TOAST_DEF_RE//g")
+        [[ $rest =~ $re ]] || continue
+      fi
       if [[ $line =~ $COMPONENT_PROP_RE ]] && ! [[ $line =~ $FUNC_PROP_RE ]] && ! [[ $line =~ $strong ]]; then continue; fi
       fail UI001 "$f" "${m%%:*}" "client-only API without a leading 'use client' directive" && break
     done < <(grep -nE -e "$re" -- "$f")
@@ -311,6 +321,8 @@ check_ui004() {
   done
   if [ "$handle" = 0 ]; then
     for f in ${files[@]+"${files[@]}"}; do
+      # shadcn vendor files (animate-in, animate-out) are not the project's own animation; UI003 skips them too.
+      case $f in "$BASE/components/ui/"*|"$ROOT/src/components/ui/"*) continue ;; esac
       while IFS= read -r m; do
         is_anim_line "${m#*:}" || continue
         fail UI004 "$f" "${m%%:*}" "animation without a global reduced-motion handle (prefers-reduced-motion CSS, motion-reduce:, useReducedMotion or MotionConfig reducedMotion)" && break 2

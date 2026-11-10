@@ -1,0 +1,4 @@
+exit=0
+ids=
+args=NONE
+output=no tsconfig.json, UI006 skipped

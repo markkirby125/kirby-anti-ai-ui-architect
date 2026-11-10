@@ -1,0 +1,4 @@
+exit=2
+ids=
+args=--root /nonexistent/verify-ui-root
+output=no such directory
