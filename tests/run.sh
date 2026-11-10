@@ -3,7 +3,7 @@
 # Usage: bash tests/run.sh [case-glob]   (default: all cases)
 # Env:   VERIFY_UI_BIN overrides the gate path (tests/hooks.sh uses it to test the runner itself).
 # EXPECT: exit=N (required); ids=UI001,... (the set of FAIL IDs); at=UIxxx path:line, one line per FAIL line,
-#         compared exactly and required when exit=1 and ids= is not empty; optional args=, arg=, output=.
+#         compared exactly and required when exit=1 and ids= is not empty; optional args=, arg=, output= (must appear), noutput= (must not appear).
 # Exit:  0 all selected cases pass, 1 any case fails, 2 runner error.
 set -u
 
@@ -48,6 +48,8 @@ for dir in "$FIXTURES"/$PATTERN/; do
   raw_args="$(sed -n 's/^args=//p' "$expect_file" | head -n 1)"
   # Optional: text the gate output (stdout and stderr) must contain, for stderr notes and usage text.
   exp_out="$(sed -n 's/^output=//p' "$expect_file" | head -n 1)"
+  # Optional: text the gate output must NOT contain (pins where usage text stops, for example).
+  exp_nout="$(sed -n 's/^noutput=//p' "$expect_file" | head -n 1)"
   # at= lines: one "UIxxx path:line" per expected FAIL line, compared exactly (order-insensitive, duplicates count).
   exp_at="$(sed -n 's/^at=//p' "$expect_file" | LC_ALL=C sort | paste -sd';' -)"
   if [ -z "$exp_exit" ]; then
@@ -91,11 +93,12 @@ for dir in "$FIXTURES"/$PATTERN/; do
   act_at="$(printf '%s\n' "$out" | awk '/^FAIL UI[0-9]+ / { if (match($0, /:[0-9]+: /)) print substr($0, 6, RSTART + RLENGTH - 8); else print "UNPARSED " $0 }' | LC_ALL=C sort | paste -sd';' -)"
 
   if [ "$code" = "$exp_exit" ] && [ "$act_ids" = "$exp_ids" ] && [ "$act_at" = "$exp_at" ] \
-     && { [ -z "$exp_out" ] || printf '%s\n' "$out" | grep -qF -- "$exp_out"; }; then
+     && { [ -z "$exp_out" ] || printf '%s\n' "$out" | grep -qF -- "$exp_out"; } \
+     && { [ -z "$exp_nout" ] || ! printf '%s\n' "$out" | grep -qF -- "$exp_nout"; }; then
     echo "PASS $case_name"
     passed=$((passed + 1))
   else
-    echo "FAIL $case_name: expected exit=$exp_exit ids=[$exp_ids] at=[$exp_at]${exp_out:+ output~[$exp_out]}, got exit=$code ids=[$act_ids] at=[$act_at]"
+    echo "FAIL $case_name: expected exit=$exp_exit ids=[$exp_ids] at=[$exp_at]${exp_out:+ output~[$exp_out]}${exp_nout:+ output!~[$exp_nout]}, got exit=$code ids=[$act_ids] at=[$act_at]"
     printf '%s\n' "$out" | head -n 10 | sed 's/^/    | /'
     failed=$((failed + 1))
   fi

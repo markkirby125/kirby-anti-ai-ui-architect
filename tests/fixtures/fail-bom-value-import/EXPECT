@@ -1,0 +1,5 @@
+exit=1
+ids=UI002
+args=--skip-tsc
+at=UI002 src/lib/types.ts:3
+at=UI002 src/lib/more.ts:1
