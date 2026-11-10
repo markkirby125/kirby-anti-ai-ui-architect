@@ -43,7 +43,7 @@
 set -u
 # No pipefail on purpose: "producer | grep -q" would fail on the producer's SIGPIPE.
 
-usage() { sed -n '5,11p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { awk '/^# Usage:/ { p = 1 } p && /^#$/ { exit } p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "verify-ui: $*" >&2; exit 2; }
 
 # ---------- arguments ----------
@@ -152,7 +152,10 @@ if [ -n "$GLOBAL_CSS" ]; then
   GLOBAL_FILES=("$GLOBAL_CSS")
   while IFS= read -r imp; do
     imp=$(dirname "$GLOBAL_CSS")/${imp#./}
-    case " ${GLOBAL_FILES[*]} " in *" $imp "*) continue ;; esac
+    # Exact match per element: a joined string would let "./a b.css" hide a later "./b.css".
+    seen=0
+    for g in "${GLOBAL_FILES[@]}"; do [ "$g" = "$imp" ] && seen=1; done
+    [ "$seen" = 1 ] && continue
     [ -f "$imp" ] && GLOBAL_FILES+=("$imp")
   done < <(sed -nE "s#^[[:space:]]*@import[[:space:]]+(url\\()?['\"](\\.\\.?/[^'\"]+)['\"].*#\\2#p" "$GLOBAL_CSS")
 fi
@@ -206,8 +209,12 @@ TOAST_RE="${B}toast(\\.[A-Za-z]+)?[[:space:]]*\\("
 TOAST_DEF_RE="(function|const|let|var)[[:space:]]+toast[[:space:]]*[(=:]"
 LIBIMPORT_RE="(from|import)[[:space:]]*${Q}(motion/react|vaul|cmdk|@number-flow/react|next-themes)${Q}"
 # "import type" and "export type ... from" are erased at compile time: no 'use client' (UI001), no animation (UI004).
-# shortcut: one-line statements only; a multi-line "import type {" still flags its "from" line (use the pragma).
 TYPE_IMPORT_RE="^[[:space:]]*(import|export)[[:space:]]+type[[:space:]]"
+# type_import_lines FILE: line numbers (space padded) inside a multi-line "import type {" or "export type {" statement.
+# shortcut: needs the "{" on the first line; "import type\n{" is not recognised.
+type_import_lines() {
+  LC_ALL=C awk '/^[[:space:]]*(import|export)[[:space:]]+type[[:space:]]*\{[^}]*$/ { t = 1 } t { printf " %d", NR } t && /\}/ { t = 0 } END { printf " " }' "$1"
+}
 # "document. Then" is prose; a property access needs a name after the dot. matchMedia counts only as a call.
 BROWSER_RE="${BG}(window|document|navigator)\\.[A-Za-z_\$]|${BG}(localStorage|sessionStorage)([^A-Za-z0-9_\$]|\$)|${BG}matchMedia[[:space:]]*\\("
 ONPROP_RE="[[:space:]]on[A-Z][A-Za-z0-9]*=\\{"
@@ -246,10 +253,11 @@ has_use_client() {
 # shortcut: line-based, ignores strings and comments, cannot see that a leaf is only imported by client files (use the pragma).
 check_ui001() {
   [ "$APP_ROUTER" = 1 ] || return 0
-  local f m line re strong bro
+  local f m line re strong bro tskip
   for f in ${SRC[@]+"${SRC[@]}"}; do
     case $f in "$BASE/pages/"*|*.d.ts|*.test.*|*.spec.*|*.stories.*|*/__tests__/*) continue ;; esac
     has_use_client "$f" && continue
+    tskip=$(type_import_lines "$f")
     # shortcut: one typeof guard anywhere exempts the whole file from the browser-global check (hooks and imports still count).
     if grep -qE 'typeof[[:space:]]+(window|document|navigator|localStorage|sessionStorage|matchMedia)' -- "$f"; then bro=""; else bro="|${BROWSER_RE}"; fi
     case $f in
@@ -259,6 +267,7 @@ check_ui001() {
     while IFS= read -r m; do
       line=${m#*:}
       [[ $line =~ $TYPE_IMPORT_RE ]] && continue
+      case $tskip in *" ${m%%:*} "*) continue ;; esac
       if [[ $line =~ $TOAST_DEF_RE ]]; then
         rest=$(printf '%s\n' "$line" | sed -E "s/$TOAST_DEF_RE//g")
         [[ $rest =~ $re ]] || continue
@@ -275,14 +284,18 @@ DEP_RE="^(${BANNED})\$"
 IMPORT_RE="(from|import|require)[[:space:]]*\\(?[[:space:]]*${Q}(${BANNED})(/[^'\"]*)?${Q}"
 
 check_ui002() {
-  local dep n f m
+  local dep n f m tskip
   while IFS= read -r dep; do
     [[ -n $dep && $dep =~ $DEP_RE ]] || continue
     n=$(grep -nF -e "\"$dep\"" -- "$ROOT/package.json" | head -n 1 | cut -d: -f1)
     fail UI002 "$ROOT/package.json" "${n:-1}" "banned animation runtime '$dep' is a direct dependency; use motion"
   done <<< "$DEPS"
   for f in ${SRC[@]+"${SRC[@]}"}; do
+    tskip=$(type_import_lines "$f")
     while IFS= read -r m; do
+      # A type-only import is erased at compile time; a direct dependency is still caught from package.json above.
+      [[ ${m#*:} =~ $TYPE_IMPORT_RE ]] && continue
+      case $tskip in *" ${m%%:*} "*) continue ;; esac
       fail UI002 "$f" "${m%%:*}" "import of a banned animation runtime; use motion"
     done < <(grep -nE -e "$IMPORT_RE" -- "$f")
   done
@@ -333,7 +346,7 @@ check_ui004() {
   for f in ${GLOBAL_FILES[@]+"${GLOBAL_FILES[@]}"}; do
     case " ${CSS[*]-} " in *" $f "*) ;; *) files+=("$f") ;; esac
   done
-  local handle=0 re
+  local handle=0 re tskip
   for f in ${files[@]+"${files[@]}"}; do
     case $f in *.css) re=$CSS_HANDLE_RE ;; *) re=$HANDLE_RE ;; esac
     grep -qE -e "$re" -- "$f" && { handle=1; break; }
@@ -342,7 +355,9 @@ check_ui004() {
     for f in ${files[@]+"${files[@]}"}; do
       # shadcn vendor files (animate-in, animate-out) are not the project's own animation; UI003 skips them too.
       case $f in "$BASE/components/ui/"*|"$ROOT/src/components/ui/"*) continue ;; esac
+      tskip=$(type_import_lines "$f")
       while IFS= read -r m; do
+        case $tskip in *" ${m%%:*} "*) continue ;; esac
         is_anim_line "${m#*:}" || continue
         fail UI004 "$f" "${m%%:*}" "animation without a global reduced-motion handle (prefers-reduced-motion CSS, motion-reduce:, useReducedMotion or MotionConfig reducedMotion)" && break 2
       done < <(grep -nE -e "${ANIM_CORE_RE}|animate-[a-z[]" -- "$f")

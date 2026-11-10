@@ -1,0 +1,4 @@
+exit=1
+ids=UI007
+args=--skip-tsc
+at=UI007 src/app/../styles/b.css:2
