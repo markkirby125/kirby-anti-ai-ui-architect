@@ -43,7 +43,8 @@
 set -u
 # No pipefail on purpose: "producer | grep -q" would fail on the producer's SIGPIPE.
 
-usage() { awk '/^# Usage:/ { p = 1 } p && /^#$/ { exit } p' "$0" | sed 's/^# \{0,1\}//'; }
+# Prints the header from "# Usage:" up to (not including) "# Output:": usage, exit codes and the check list.
+usage() { awk '/^# Usage:/ { p = 1 } p && /^# Output:/ { exit } p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "verify-ui: $*" >&2; exit 2; }
 
 # ---------- arguments ----------
@@ -209,11 +210,13 @@ TOAST_RE="${B}toast(\\.[A-Za-z]+)?[[:space:]]*\\("
 TOAST_DEF_RE="(function|const|let|var)[[:space:]]+toast[[:space:]]*[(=:]"
 LIBIMPORT_RE="(from|import)[[:space:]]*${Q}(motion/react|vaul|cmdk|@number-flow/react|next-themes)${Q}"
 # "import type" and "export type ... from" are erased at compile time: no 'use client' (UI001), no animation (UI004).
-TYPE_IMPORT_RE="^[[:space:]]*(import|export)[[:space:]]+type[[:space:]]"
+# The optional leading UTF-8 BOM is only ever present on a file's first line.
+TYPE_IMPORT_RE=$'^(\xef\xbb\xbf)?[[:space:]]*(import|export)[[:space:]]+type[[:space:]]'
 # type_import_lines FILE: line numbers (space padded) inside a multi-line "import type {" or "export type {" statement.
 # shortcut: needs the "{" on the first line; "import type\n{" is not recognised.
 type_import_lines() {
-  LC_ALL=C awk '/^[[:space:]]*(import|export)[[:space:]]+type[[:space:]]*\{[^}]*$/ { t = 1 } t { printf " %d", NR } t && /\}/ { t = 0 } END { printf " " }' "$1"
+  LC_ALL=C awk 'NR == 1 { sub(/^\357\273\277/, "") }
+    /^[[:space:]]*(import|export)[[:space:]]+type[[:space:]]*\{[^}]*$/ { t = 1 } t { printf " %d", NR } t && /\}/ { t = 0 } END { printf " " }' "$1"
 }
 # "document. Then" is prose; a property access needs a name after the dot. matchMedia counts only as a call.
 BROWSER_RE="${BG}(window|document|navigator)\\.[A-Za-z_\$]|${BG}(localStorage|sessionStorage)([^A-Za-z0-9_\$]|\$)|${BG}matchMedia[[:space:]]*\\("
