@@ -8,7 +8,11 @@ cd "$root" || exit 0
 bash scripts/verify-ui.sh
 rc=$?
 if [ "$rc" -ne 0 ]; then
-  echo "pre-push: verify-ui failed (exit $rc). Fix the findings above, then push again." >&2
+  if [ "$rc" -eq 1 ]; then
+    echo "pre-push: verify-ui failed (exit $rc). Fix the findings above, then push again." >&2
+  else
+    echo "pre-push: verify-ui could not run (exit $rc). Fix the environment problem reported above, then push again." >&2
+  fi
   exit 1
 fi
 exit 0

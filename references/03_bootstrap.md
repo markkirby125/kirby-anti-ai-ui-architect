@@ -49,7 +49,8 @@ Same snippet with `CLAUDE.md` and `templates/CLAUDE.section.md`. Then, only if `
 
 ```bash
 mkdir -p scripts
-SHA=$(git -C "<skill>" rev-parse --short HEAD)$([ -n "$(git -C "<skill>" status --porcelain)" ] && echo -dirty)
+SHA=$(git -C "<skill>" rev-parse --short HEAD 2>/dev/null) || SHA=unknown
+[ -z "$(git -C "<skill>" status --porcelain 2>/dev/null)" ] || SHA=$SHA-dirty
 NEW=$(mktemp)
 sed "2s/.*/# skill-sha: $SHA/" "<skill>/bin/verify-ui.sh" > "$NEW"
 if [ -f scripts/verify-ui.sh ] && ! cmp -s "$NEW" scripts/verify-ui.sh; then
@@ -93,13 +94,15 @@ git rev-parse --is-inside-work-tree >/dev/null && node -e '
 const fs=require("fs");const s=fs.readFileSync("package.json","utf8");const p=JSON.parse(s);
 const ind=(s.match(/^[ \t]+(?=")/m)||["  "])[0];
 const cmd="git config core.hooksPath .githooks";
+const cur=require("child_process").spawnSync("git",["config","--get","core.hooksPath"],{encoding:"utf8"}).stdout.trim();
+if(cur&&cur!==".githooks"){console.error("core.hooksPath is already "+cur+" ; ask the user how to combine");process.exit(2)}
 p.scripts=p.scripts||{};
 if(!p.scripts.prepare)p.scripts.prepare=cmd;
 else if(!p.scripts.prepare.includes(cmd)){console.error("prepare already set: "+p.scripts.prepare+" ; ask the user how to combine");process.exit(2)}
 fs.writeFileSync("package.json",JSON.stringify(p,null,ind)+"\n")' && git config core.hooksPath .githooks
 ```
 
-The `&&` matters: when `prepare` is already set the script exits 2, and `core.hooksPath` must stay untouched (repointing it would silently switch off an existing husky or custom hook setup). The `git rev-parse` check runs first, so outside a git repo nothing is written (the `prepare` script would fail every `npm install` there). The rewrite keeps the file's indentation and key order, but other hand formatting is normalised.
+The `&&` matters: when `prepare` is already set, or `core.hooksPath` (local or global) already points somewhere other than `.githooks`, the script exits 2 before writing anything and `core.hooksPath` stays untouched (repointing it would silently switch off an existing husky or custom hook setup, and the `prepare` script would redo that on every install). Show the message to the user and ask how to combine. The `git rev-parse` check runs first, so outside a git repo nothing is written (the `prepare` script would fail every `npm install` there). The rewrite keeps the file's indentation and key order, but other hand formatting is normalised.
 
 The git hook runs the full gate including tsc. `--no-verify` skips it; only CI closes that gap.
 

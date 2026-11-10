@@ -98,6 +98,12 @@ if [ -d "$ROOT/app" ] || [ -d "$ROOT/pages" ]; then
   fi
 elif [ -d "$ROOT/src/app" ] || [ -d "$ROOT/src/pages" ] || [ -d "$ROOT/src/components" ]; then
   BASE=$ROOT/src
+  # The src layout scans only src/; say so when root-level shared dirs exist instead of passing silently.
+  if [ "$DIRS_SET" != 1 ]; then
+    for d in components hooks lib; do
+      [ -d "$ROOT/$d" ] && echo "verify-ui: src/ layout in use, so root $d/ is not scanned (move it under src/ or pass --dirs)" >&2
+    done
+  fi
 fi
 
 SCAN=()
@@ -176,7 +182,7 @@ VIOL=()
 # is_ignored FILE LINE ID: pragma on LINE or LINE-1.
 is_ignored() {
   local from=$(( $2 > 1 ? $2 - 1 : 1 ))
-  sed -n "${from},${2}p" "$1" | grep -qE "(//|/\\*).*verify-ui-ignore([[:space:],]+UI[0-9]+)*[[:space:],]+$3([^0-9]|\$)"
+  sed -n "${from},${2}p" "$1" 2>/dev/null | grep -qE "(//|/\\*).*verify-ui-ignore([[:space:],]+UI[0-9]+)*[[:space:],]+$3([^0-9]|\$)"
 }
 
 # fail ID FILE LINE MESSAGE: record unless ignored; returns 1 when ignored.
@@ -373,7 +379,7 @@ check_ui006() {
   if grep -qF '.next/types' "$ROOT/tsconfig.json" && [ ! -d "$ROOT/.next/types" ]; then
     echo "verify-ui: .next/types missing; run 'next typegen' or 'next build' if typed-route errors appear" >&2
   fi
-  local out code line parsed=0
+  local out code line p parsed=0
   # --incremental false would abort on composite projects (TS6379), so the build info goes to a temp dir instead.
   local tmp
   tmp=$(mktemp -d) || die "cannot create a temp dir"
@@ -383,11 +389,14 @@ check_ui006() {
   [ "$code" -eq 0 ] && return 0
   while IFS= read -r line; do
     if [[ $line =~ ^(.+)\(([0-9]+),[0-9]+\):\ error\ (.*)$ ]]; then
-      VIOL+=("FAIL UI006 ${BASH_REMATCH[1]}:${BASH_REMATCH[2]}: ${BASH_REMATCH[3]}")
+      # tsc paths are ROOT-relative; fail() needs the file path to read a pragma from it.
+      p=${BASH_REMATCH[1]}
+      case $p in /*) ;; *) p=$ROOT/$p ;; esac
+      fail UI006 "$p" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
       parsed=1
     fi
   done <<< "$out"
-  [ "$parsed" = 1 ] || VIOL+=("FAIL UI006 tsconfig.json:1: tsc --noEmit exited $code${out:+: ${out%%$'\n'*}}")
+  [ "$parsed" = 1 ] || fail UI006 "$ROOT/tsconfig.json" 1 "tsc --noEmit exited $code${out:+: ${out%%$'\n'*}}"
 }
 
 # ---------- run ----------
