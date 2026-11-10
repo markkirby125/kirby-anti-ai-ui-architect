@@ -205,6 +205,9 @@ TOAST_RE="${B}toast(\\.[A-Za-z]+)?[[:space:]]*\\("
 # A line that only defines a toast helper (function toast(, const toast =) is not a toast call.
 TOAST_DEF_RE="(function|const|let|var)[[:space:]]+toast[[:space:]]*[(=:]"
 LIBIMPORT_RE="(from|import)[[:space:]]*${Q}(motion/react|vaul|cmdk|@number-flow/react|next-themes)${Q}"
+# "import type" and "export type ... from" are erased at compile time: no 'use client' (UI001), no animation (UI004).
+# shortcut: one-line statements only; a multi-line "import type {" still flags its "from" line (use the pragma).
+TYPE_IMPORT_RE="^[[:space:]]*(import|export)[[:space:]]+type[[:space:]]"
 # "document. Then" is prose; a property access needs a name after the dot. matchMedia counts only as a call.
 BROWSER_RE="${BG}(window|document|navigator)\\.[A-Za-z_\$]|${BG}(localStorage|sessionStorage)([^A-Za-z0-9_\$]|\$)|${BG}matchMedia[[:space:]]*\\("
 ONPROP_RE="[[:space:]]on[A-Z][A-Za-z0-9]*=\\{"
@@ -255,6 +258,7 @@ check_ui001() {
     esac
     while IFS= read -r m; do
       line=${m#*:}
+      [[ $line =~ $TYPE_IMPORT_RE ]] && continue
       if [[ $line =~ $TOAST_DEF_RE ]]; then
         rest=$(printf '%s\n' "$line" | sed -E "s/$TOAST_DEF_RE//g")
         [[ $rest =~ $re ]] || continue
@@ -310,6 +314,7 @@ LOOP_GUARD_RE='prefers-reduced-motion|useReducedMotion'
 
 # is_anim_line TEXT: animation import, keyframes, rAF/canvas, or an animate-* class other than spin/pulse/none.
 is_anim_line() {
+  [[ $1 =~ $TYPE_IMPORT_RE ]] && return 1
   [[ $1 =~ $ANIM_CORE_RE ]] && return 0
   local rest=$1
   # The class must start a token: "tw-animate-css" (the shadcn v4 default import) is not an animate-* class.

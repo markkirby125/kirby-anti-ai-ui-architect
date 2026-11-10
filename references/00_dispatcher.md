@@ -9,7 +9,7 @@ Out of scope: Vite, CRA, Remix and Astro projects; machine-checking taste rules 
 ## Locked decisions
 
 1. Beautiful UI is https://www.beautifului.dev, a shadcn-schema registry. Its `foundation` style is Tailwind v4 only and defines its own radii (6/8/10/14px). Install path under test, do not claim it works. On Tailwind v3 projects, route to `@prompt-kit` or `@assistant-ui` instead.
-2. No vendoring. Bootstrap writes only `AGENTS.md`, `CLAUDE.md`, `scripts/verify-ui.sh` and hook config into the target. The skill itself stays global.
+2. No vendoring. Bootstrap writes only `AGENTS.md`, `CLAUDE.md`, `scripts/verify-ui.sh`, the Stop hook in `.claude/settings.json` and the git hook (`.githooks/pre-push` plus `scripts.prepare` in `package.json`, or the pre-push step of an existing husky or lefthook setup) into the target. The optional CI workflow and the Beautiful UI foundation checklist (`03_bootstrap.md` 1f and section 2) write only after their own yes. The skill itself stays global.
 3. The radius rule rejects the shadcn defaults only (`--radius: 0.5rem` or `0.625rem`). Other values are the project's choice.
 
 ## Step 0 in every mode: applicability check
@@ -41,7 +41,7 @@ Run `bash scripts/verify-ui.sh --skip-tsc` in the target (or `bash <skill>/bin/v
 
 ### bootstrap
 
-Follow `03_bootstrap.md`. Output: the proposed diff for each artefact (marked block in `AGENTS.md`, marked block plus `@AGENTS.md` in `CLAUDE.md`, `scripts/verify-ui.sh`, Stop hook, git hook), the approval prompt, then the applied changes and a gate run on the result. Bootstrap is idempotent: a second run replaces the marked blocks, never duplicates them. The CI template is optional and not installed by default.
+Follow `03_bootstrap.md`. Output: the proposed diff for each artefact (marked block in `AGENTS.md`, marked block plus `@AGENTS.md` in `CLAUDE.md`, `scripts/verify-ui.sh`, Stop hook in `.claude/settings.json`, git hook with its `package.json` `scripts.prepare` change), the approval prompt, then the applied changes and a gate run on the result. Bootstrap is idempotent: a second run replaces the marked blocks, never duplicates them. The CI template is optional and not installed by default.
 
 ### build
 
