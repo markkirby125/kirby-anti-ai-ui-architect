@@ -8,6 +8,8 @@ set -u
 S="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES="$S/tests/fixtures"
 GATE="${VERIFY_UI_BIN:-$S/bin/verify-ui.sh}"
+# The gate runs from inside the case dir (for a relative --root), so a relative override must be made absolute.
+case $GATE in /*) ;; *) GATE="$PWD/$GATE" ;; esac
 PATTERN="${1:-*}"
 
 if [ ! -f "$GATE" ]; then
@@ -23,6 +25,7 @@ trap 'chmod -R u+rwx "$TMPROOT" 2>/dev/null; rm -rf "$TMPROOT"' EXIT INT TERM
 passed=0
 failed=0
 errors=0
+skipped=0
 matched=0
 
 norm_ids() { tr ',' '\n' | sed '/^[[:space:]]*$/d' | sort -u | paste -sd, -; }
@@ -49,7 +52,10 @@ for dir in "$FIXTURES"/$PATTERN/; do
     continue
   fi
   args=()
-  if [ -z "$raw_args" ]; then
+  # arg= lines (one argument each) win over args=, for a value with spaces such as --dirs "a b".
+  if grep -q '^arg=' "$expect_file"; then
+    while IFS= read -r a; do args+=("$a"); done < <(sed -n 's/^arg=//p' "$expect_file")
+  elif [ -z "$raw_args" ]; then
     args=(--skip-tsc)
   elif [ "$raw_args" != "NONE" ]; then
     read -r -a args <<< "$raw_args"
@@ -63,12 +69,12 @@ for dir in "$FIXTURES"/$PATTERN/; do
   [ -d "$work/dot-next.in" ] && mv "$work/dot-next.in" "$work/.next"
   # unreadable.in lists project-relative paths to chmod 000 (git cannot store that mode). Not run as root: root reads anyway.
   if [ -f "$work/unreadable.in" ]; then
-    if [ "$(id -u)" = 0 ]; then echo "SKIP $case_name: running as root"; continue; fi
+    if [ "$(id -u)" = 0 ]; then echo "SKIP $case_name: running as root"; skipped=$((skipped + 1)); continue; fi
     while IFS= read -r p; do [ -n "$p" ] && chmod 000 "$work/$p"; done < "$work/unreadable.in"
     rm -f "$work/unreadable.in"
   fi
 
-  out="$(bash "$GATE" --root "$work" ${args[@]+"${args[@]}"} 2>&1)"
+  out="$(cd "$work" && bash "$GATE" --root "$work" ${args[@]+"${args[@]}"} 2>&1)"
   code=$?
   act_ids="$(printf '%s\n' "$out" | grep -oE '^FAIL UI[0-9]+' | awk '{print $2}' | sort -u | paste -sd, -)"
 
@@ -88,7 +94,8 @@ if [ "$matched" -eq 0 ]; then
   exit 2
 fi
 
-echo "$passed passed, $failed failed"
+# Skips are counted so a run as root does not look like a full pass.
+if [ "$skipped" -gt 0 ]; then echo "$passed passed, $failed failed, $skipped skipped"; else echo "$passed passed, $failed failed"; fi
 [ "$errors" -gt 0 ] && exit 2
 [ "$failed" -gt 0 ] && exit 1
 exit 0

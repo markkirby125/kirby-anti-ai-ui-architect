@@ -5,7 +5,7 @@
 # Usage: bash verify-ui.sh [--root DIR] [--skip-tsc] [--dirs "a b"]
 #   --root DIR    project root holding package.json (default: .)
 #   --skip-tsc    skip UI006 (type check)
-#   --dirs "a b"  scan these dirs (relative to ROOT, space separated) instead of
+#   --dirs "a b"  scan these dirs (relative to ROOT unless absolute, space separated) instead of
 #                 the existing members of app pages components hooks lib under
 #                 BASE (ROOT/src when it holds app, pages or components and ROOT
 #                 has no app/ or pages/, else ROOT plus src/components|hooks|lib)
@@ -13,10 +13,13 @@
 # Exit codes:
 #   0  no violations
 #   1  one or more violations
-#   2  usage or environment error: unknown flag, no package.json, next or react
-#      not a direct dependency, node missing, tsconfig.json present but
-#      TypeScript not installed and no --skip-tsc (no tsconfig.json: UI006 is
-#      skipped with a stderr note, not an error)
+#   2  usage or environment error: unknown argument, --root or --dirs without a
+#      value, no such directory (ROOT or a --dirs entry), no package.json or one
+#      node cannot parse, next or react not a direct dependency, node missing,
+#      tsconfig.json present but TypeScript not installed and no --skip-tsc,
+#      nothing to scan, an unreadable file or directory, no temp dir for UI006
+#      (no tsconfig.json: UI006 is skipped with a stderr note, not an error)
+#   -h or --help prints this usage and exits 0.
 #
 # Checks:
 #   UI001  app-router file uses client-only APIs without a leading 'use client'
@@ -30,7 +33,8 @@
 #          -card, -window) in the global CSS
 #
 # Output: "FAIL UI00N <path>:<line>: <message>" per violation (path relative to
-# ROOT), then "verify-ui: N violation(s)".
+# ROOT), then "verify-ui: N violation(s)". UI001 and the UI004 loop check report
+# the first hit per file, the global UI004 check the first hit per run.
 # Ignore pragma: "verify-ui-ignore UI00N" inside any comment (//, /* */ or
 # {/* */}) on the violating line or the line above. Several IDs may follow.
 # File-level form: "verify-ui-ignore-file UI00N" anywhere in a file (for a legal
@@ -61,7 +65,7 @@ done
 
 # ---------- environment ----------
 [ -d "$ROOT" ] || die "no such directory: $ROOT"
-ROOT=$(cd "$ROOT" && pwd) || die "cannot enter $ROOT"
+ROOT=$(cd -- "$ROOT" && pwd) || die "cannot enter $ROOT"
 [ -f "$ROOT/package.json" ] || die "no package.json in $ROOT"
 command -v node >/dev/null 2>&1 || die "node not found on PATH"
 
@@ -132,6 +136,7 @@ if [ -z "$GLOBAL_CSS" ]; then
     [ -f "$c" ] && { GLOBAL_CSS=$c; break; }
   done
 fi
+[ -n "$GLOBAL_CSS" ] || echo "verify-ui: no global stylesheet found, UI005 and UI007 skipped" >&2
 
 # Global CSS plus the local files it @imports (Beautiful UI ships its foundation as one).
 # shortcut: one level deep, relative "./" or "../" paths only.
@@ -171,12 +176,12 @@ VIOL=()
 # is_ignored FILE LINE ID: pragma on LINE or LINE-1.
 is_ignored() {
   local from=$(( $2 > 1 ? $2 - 1 : 1 ))
-  sed -n "${from},${2}p" "$1" | grep -qE "verify-ui-ignore([[:space:],]+UI[0-9]+)*[[:space:],]+$3([^0-9]|\$)"
+  sed -n "${from},${2}p" "$1" | grep -qE "(//|/\\*).*verify-ui-ignore([[:space:],]+UI[0-9]+)*[[:space:],]+$3([^0-9]|\$)"
 }
 
 # fail ID FILE LINE MESSAGE: record unless ignored; returns 1 when ignored.
 fail() {
-  grep -qE "verify-ui-ignore-file([[:space:],]+UI[0-9]+)*[[:space:],]+$1([^0-9]|\$)" "$2" 2>/dev/null && return 1
+  grep -qE "(//|/\\*).*verify-ui-ignore-file([[:space:],]+UI[0-9]+)*[[:space:],]+$1([^0-9]|\$)" "$2" 2>/dev/null && return 1
   if [ "$3" -gt 0 ] && is_ignored "$2" "$3" "$1"; then return 1; fi
   VIOL+=("FAIL $1 ${2#"$ROOT"/}:$3: $4")
 }
@@ -252,7 +257,7 @@ check_ui001() {
 }
 
 # ---------- UI002 ----------
-BANNED='framer-motion|gsap|lottie-web|lottie-react|@lottiefiles/[^'"'"'"/]+|react-spring|@react-spring/[^'"'"'"/]+'
+BANNED='framer-motion|gsap|lottie-web|lottie-react|@gsap/[^'"'"'"/]+|@lottiefiles/[^'"'"'"/]+|react-spring|@react-spring/[^'"'"'"/]+'
 DEP_RE="^(${BANNED})\$"
 IMPORT_RE="(from|import|require)[[:space:]]*\\(?[[:space:]]*${Q}(${BANNED})(/[^'\"]*)?${Q}"
 
@@ -271,10 +276,10 @@ check_ui002() {
 }
 
 # ---------- UI003 ----------
-# Variants may carry brackets (data-[state=open]:, [&>*]:), the important marker may lead (!bg-...), opacity may be [.35].
-PAL_RE="(^|[[:space:]'\"\`])((\\[[^]]*\\]|[a-z0-9-]+(\\[[^]]*\\])?):)*!?bg-(slate|gray|zinc|neutral|stone)-(500|600|700|800|900|950)(/([0-9]+|\\[[^]]*\\]))?([^A-Za-z0-9/-]|\$)"
+# Variants may carry brackets (data-[state=open]:, [&>*]:) or a group/peer name (group-hover/nav:), the important marker may lead (!bg-...), opacity may be [.35].
+PAL_RE="(^|[[:space:]'\"\`])((\\[[^]]*\\]|[a-z0-9-]+(\\[[^]]*\\])?(/[A-Za-z0-9_-]+)?):)*!?bg-(slate|gray|zinc|neutral|stone)-(500|600|700|800|900|950)(/([0-9]+|\\[[^]]*\\]))?([^A-Za-z0-9/-]|\$)"
 
-# shortcut: class-token regex, misses arbitrary variants like [&>*]: and classes built from string pieces.
+# shortcut: class-token regex, misses classes built from string pieces.
 check_ui003() {
   local f m
   for f in ${SRC[@]+"${SRC[@]}"} ${CSS[@]+"${CSS[@]}"}; do

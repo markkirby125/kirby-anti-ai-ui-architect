@@ -1,0 +1,4 @@
+exit=0
+ids=
+args=--skip-tsc
+output=no global stylesheet found

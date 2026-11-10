@@ -1,0 +1,3 @@
+exit=1
+ids=UI003
+args=--skip-tsc --root -lead

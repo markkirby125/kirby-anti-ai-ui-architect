@@ -72,13 +72,16 @@ const fs=require("fs");const [f,tpl]=process.argv.slice(1);
 const cur=fs.existsSync(f)?JSON.parse(fs.readFileSync(f,"utf8")):{};
 const add=JSON.parse(fs.readFileSync(tpl,"utf8"));
 cur.hooks=cur.hooks||{};cur.hooks.Stop=cur.hooks.Stop||[];
-const has=cur.hooks.Stop.some(g=>(g.hooks||[]).some(h=>/verify-ui\.sh/.test(h.command||"")));
-if(!has)cur.hooks.Stop.push(...add.hooks.Stop);
+const want=add.hooks.Stop[0].hooks[0].command;
+const cmds=[].concat(...cur.hooks.Stop.map(g=>(g.hooks||[]).map(h=>h.command||"")));
+const other=cmds.find(c=>c!==want&&/verify-ui\.sh/.test(c));
+if(other){console.error("a different Stop hook already runs verify-ui.sh: "+other+" ; ask the user before replacing it");process.exit(2)}
+if(!cmds.includes(want))cur.hooks.Stop.push(...add.hooks.Stop);
 fs.mkdirSync(require("path").dirname(f),{recursive:true});
 fs.writeFileSync(f,JSON.stringify(cur,null,2)+"\n")' .claude/settings.json "<skill>/templates/claude-settings.stop-hook.json"
 ```
 
-Existing settings keys are kept. Running it twice adds the hook once. If `.claude/settings.json` is not valid JSON the snippet throws; show the error and stop.
+Existing settings keys are kept. Running it twice adds the hook once. If another Stop hook already mentions `verify-ui.sh` (a stale copy or another path), the snippet prints it, exits 2 and writes nothing; show it to the user and ask before replacing it. If `.claude/settings.json` is not valid JSON the snippet throws; show the error and stop.
 
 ### 1e. Git hook (all agents and humans)
 
@@ -86,16 +89,17 @@ Existing settings keys are kept. Running it twice adds the hook once. If `.claud
 - Otherwise copy `templates/githooks/pre-push` to `.githooks/pre-push` (`chmod +x`) and set `scripts.prepare` in `package.json` to `git config core.hooksPath .githooks`:
 
 ```bash
-node -e '
-const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json","utf8"));
+git rev-parse --is-inside-work-tree >/dev/null && node -e '
+const fs=require("fs");const s=fs.readFileSync("package.json","utf8");const p=JSON.parse(s);
+const ind=(s.match(/^[ \t]+(?=")/m)||["  "])[0];
 const cmd="git config core.hooksPath .githooks";
 p.scripts=p.scripts||{};
 if(!p.scripts.prepare)p.scripts.prepare=cmd;
 else if(!p.scripts.prepare.includes(cmd)){console.error("prepare already set: "+p.scripts.prepare+" ; ask the user how to combine");process.exit(2)}
-fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")' && git config core.hooksPath .githooks
+fs.writeFileSync("package.json",JSON.stringify(p,null,ind)+"\n")' && git config core.hooksPath .githooks
 ```
 
-The `&&` matters: when `prepare` is already set the script exits 2, and `core.hooksPath` must stay untouched (repointing it would silently switch off an existing husky or custom hook setup).
+The `&&` matters: when `prepare` is already set the script exits 2, and `core.hooksPath` must stay untouched (repointing it would silently switch off an existing husky or custom hook setup). The `git rev-parse` check runs first, so outside a git repo nothing is written (the `prepare` script would fail every `npm install` there). The rewrite keeps the file's indentation and key order, but other hand formatting is normalised.
 
 The git hook runs the full gate including tsc. `--no-verify` skips it; only CI closes that gap.
 

@@ -13,15 +13,15 @@ bash scripts/verify-ui.sh                # full: includes tsc, used by the git h
 
 If the target has no copy, run the skill's own: `bash <skill>/bin/verify-ui.sh --root <target> --skip-tsc`.
 
-Flags: `--root DIR`, `--skip-tsc`, `--dirs "a b"` (relative to the root). The gate writes nothing into the project (UI006 keeps the tsc build info in a temp dir it removes), uses no network and no `eval`, and works under paths with spaces.
+Flags: `--root DIR`, `--skip-tsc`, `--dirs "a b"` (relative to the root unless absolute; an absolute entry is used as given), `-h` (usage, exit 0). The gate writes nothing into the project (UI006 keeps the tsc build info in a temp dir it removes), uses no network and no `eval`, and works under paths with spaces.
 
 ## Read the result
 
 | Exit | Meaning | Action |
 |---|---|---|
 | 0 | No violations | Done. Report it. |
-| 1 | One or more `FAIL UI00N <path>:<line>: <message>` lines | Fix in the order below. |
-| 2 | Environment error (no `package.json`, not a Next.js + React project, node missing, `tsconfig.json` present but TypeScript not installed and no `--skip-tsc`, empty scan list; a project with no `tsconfig.json` skips UI006 with a stderr note and is not an error) | Fix the environment. Never treat 2 as a pass. |
+| 1 | One or more `FAIL UI00N <path>:<line>: <message>` lines (UI001 and the UI004 loop check report the first hit per file, the global UI004 check the first hit per run) | Fix in the order below. |
+| 2 | Usage or environment error (unknown argument, `--root` or `--dirs` without a value, no such directory for the root or a `--dirs` entry, no `package.json` or one that does not parse, not a Next.js + React project, node missing, `tsconfig.json` present but TypeScript not installed and no `--skip-tsc`, nothing to scan, an unreadable file or directory, no temp dir for UI006; a project with no `tsconfig.json` skips UI006 with a stderr note and is not an error) | Fix the environment. Never treat 2 as a pass. |
 
 A clean run is not proof the project is good. The gate does not check taste rules, and a silent pass can mean the scan list was wrong; confirm the scanned dirs when the result surprises you.
 
@@ -48,7 +48,18 @@ Re-run after each group. Stop when the exit code is 0.
 - When a root `app/` or `pages/` exists next to `src/app` or `src/pages`, Next.js ignores the `src` tree, so the gate does too and prints a stderr note instead of passing silently. Move or delete one of the two layouts to get the `src` tree scanned.
 - An unreadable file or directory makes the gate exit 2 instead of passing. The directory check needs GNU find (`-readable`); elsewhere only unreadable files are caught.
 - UI006 runs the checked repository's own `node_modules/.bin/tsc`. That is code from the target's dependencies, so run it only on projects you trust.
-- LOW findings from the independent review are not fixed: a pragma inside a string still suppresses, `import { useState as s }` and `from` split across lines are missed, npm aliases and `@gsap/react` are not banned, `.mdx` files are not scanned for UI003, symlinked sources are skipped, and `@import` following stops after one local level. They are listed in the project handoff doc. Report one as a gate limit if it affects a result.
+- With no global stylesheet (`components.json` `tailwind.css` or a standard `globals.css`), UI005 and UI007 are skipped with a stderr note.
+- Accepted limits, each by design or not worth its cost; report one as a gate limit if it affects a result:
+  - A pragma must follow `//` or `/*` on its line, so a string holding one of those plus the pragma still suppresses; telling strings from comments needs a parser.
+  - UI001 misses aliased hooks (`useState as s`) and an `on*` prop at column 0, and UI002 misses a specifier split from its `from` across lines; Prettier never writes the last two, and `next build` catches the boundary errors.
+  - UI002 reads only `dependencies` and `devDependencies` and does not resolve npm aliases (`"x": "npm:framer-motion@11"`); an alias is a deliberate choice, not the default the rule exists to stop.
+  - `.mdx` files are not scanned: their fenced code samples would be flagged, and the components they import are scanned.
+  - Symlinked sources are skipped: following them risks loops and reads outside the root.
+  - `@import` following stops after one quoted, relative level, and a commented-out radius token still counts: delete the dead line or add a pragma.
+  - `"use client"` after `"use strict"` or followed by a comment on the same line, and a `'use server'` file that matches, need a pragma; all are rare.
+  - A very long minified line makes UI003 slow: keep vendored minified files out of the scan dirs.
+  - An absolute `--dirs` entry, `components.json` `tailwind.css` and a relative `@import` can read outside the root; this is read-only and the gate writes nothing.
+  - The Stop hook passes the turn on gate exit 2 on purpose, so a broken environment cannot trap the agent in a loop; the git hook and CI still fail on it.
 - Taste rules (palette ratio, font pairing, one standout per page) are not checked.
 
 ## Copy drift (R5)
