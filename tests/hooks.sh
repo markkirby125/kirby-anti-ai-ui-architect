@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks for the parts of the skill that tests/run.sh cannot reach: the bootstrap snippets in
 # references/03_bootstrap.md (1c SHA header, 1e core.hooksPath), templates/githooks/pre-push, the Stop hook in
-# templates/claude-settings.stop-hook.json, and the at= checks of tests/run.sh itself.
+# templates/claude-settings.stop-hook.json, the at= checks of tests/run.sh itself, and a gate case a fixture cannot
+# hold (an absolute components.json tailwind.css path).
 # The snippets are extracted from the doc and run as written, in throwaway repos under a temp dir.
 # Usage: bash tests/hooks.sh        Exit: 0 all pass, 1 any fail.
 set -u
@@ -24,13 +25,30 @@ block() {
 }
 
 # ---- 1c: skill-sha header when the skill dir is not a git checkout (LOW: empty header) ----
-fake="$T/skill"
-mkdir -p "$fake/bin" "$T/proj1"
-cp "$S/bin/verify-ui.sh" "$fake/bin/verify-ui.sh"
-block "### 1c" | sed "s#<skill>#$fake#g" > "$T/1c.sh"
-(cd "$T/proj1" && bash "$T/1c.sh" >/dev/null 2>&1)
-hdr="$(sed -n 2p "$T/proj1/scripts/verify-ui.sh" 2>/dev/null)"
+# sha1c SKILL PROJ: makes SKILL/bin/verify-ui.sh, runs the 1c snippet for SKILL in a new PROJ, prints line 2 of the copy.
+sha1c() {
+  mkdir -p "$1/bin" "$2"
+  [ -f "$1/bin/verify-ui.sh" ] || cp "$S/bin/verify-ui.sh" "$1/bin/verify-ui.sh"
+  block "### 1c" | sed "s#<skill>#$1#g" > "$T/1c.sh"
+  (cd "$2" && bash "$T/1c.sh" >/dev/null 2>&1)
+  sed -n 2p "$2/scripts/verify-ui.sh" 2>/dev/null
+}
+commit() { git -C "$1" add -A && git -C "$1" -c user.name=x -c user.email=x@example.invalid commit -qm x; }
+hdr="$(sha1c "$T/skill" "$T/proj1")"
 if [ "$hdr" = "# skill-sha: unknown" ]; then ok "1c-sha-not-a-git-checkout"; else bad "1c-sha-not-a-git-checkout" "line 2 was [$hdr]"; fi
+
+# ---- 1c: git -C searches upward, so only a skill dir at the top of its own repo records a SHA (LOW) ----
+own="$T/own skill"
+mkdir -p "$own/bin" && cp "$S/bin/verify-ui.sh" "$own/bin/verify-ui.sh" && git -C "$own" init -q && commit "$own"
+sha="$(git -C "$own" rev-parse --short HEAD)"
+hdr="$(sha1c "$own" "$T/proj1b")"
+touch "$own/new-file"
+hdr2="$(sha1c "$own" "$T/proj1c")"
+if [ "$hdr" = "# skill-sha: $sha" ] && [ "$hdr2" = "# skill-sha: $sha-dirty" ]; then ok "1c-sha-own-repo"; else bad "1c-sha-own-repo" "clean [$hdr] dirty [$hdr2] want $sha"; fi
+outer="$T/outer"
+mkdir -p "$outer" && git -C "$outer" init -q && touch "$outer/x" && commit "$outer" && touch "$outer/y"
+hdr="$(sha1c "$outer/vendor/skill" "$T/proj1d")"
+if [ "$hdr" = "# skill-sha: unknown" ]; then ok "1c-sha-nested-in-other-repo"; else bad "1c-sha-nested-in-other-repo" "line 2 was [$hdr]"; fi
 
 # ---- 1e: core.hooksPath already points elsewhere (MED: silently switched off) ----
 block "### 1e" | grep -v '^$' > "$T/1e.sh"
@@ -107,6 +125,19 @@ r="$(hook "$P" 0 '{"stop_hook_active":false}')"
 if [ "$r" = "bash:0 sh:0 " ] && [ "$(cat "$P/gate-args" 2>/dev/null)" = "--skip-tsc" ]; then ok "stop-hook-clean-skip-tsc"; else bad "stop-hook-clean-skip-tsc" "$r args=[$(cat "$P/gate-args" 2>/dev/null)]"; fi
 r="$(hook "$T/proj6" 1 '{"stop_hook_active":false}')"
 if [ "$r" = "bash:0 sh:0 " ]; then ok "stop-hook-no-gate"; else bad "stop-hook-no-gate" "$r"; fi
+
+# ---- gate: an absolute components.json tailwind.css is used as given (LOW: UI005 and UI007 skipped) ----
+# Fixtures are copied to a temp dir by tests/run.sh, so a fixed absolute path cannot live in tests/fixtures.
+A="$T/proj7"
+cp -R "$S/tests/fixtures/fail-radius-default/project" "$A"
+mv "$A/src/app/globals.css" "$A/src/app/brand.css"
+printf '{ "tailwind": { "css": "%s/src/app/brand.css" } }\n' "$A" > "$A/components.json"
+bash "$S/bin/verify-ui.sh" --root "$A" --skip-tsc > "$T/abs.out" 2>&1; rc=$?
+if [ "$rc" -eq 1 ] && grep -qF 'FAIL UI005 src/app/brand.css:4:' "$T/abs.out" && ! grep -q 'no global stylesheet' "$T/abs.out"; then
+  ok "gate-absolute-tailwind-css"
+else
+  bad "gate-absolute-tailwind-css" "rc=$rc $(head -n 1 "$T/abs.out")"
+fi
 
 # ---- tests/run.sh: at= lines pin the path and line of each finding ----
 # A copy of the runner reads the fixtures beside it, so the cases live in the temp dir. The fake gate prints $T/gate.out.

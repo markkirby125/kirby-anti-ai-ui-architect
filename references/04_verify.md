@@ -53,6 +53,7 @@ Re-run after each group. Stop when the exit code is 0.
 - Accepted limits, each by design or not worth its cost; report one as a gate limit if it affects a result:
   - A pragma must follow `//` or `/*` on its line, so a string holding one of those plus the pragma still suppresses; telling strings from comments needs a parser.
   - UI001 misses aliased hooks (`useState as s`) and an `on*` prop at column 0, and UI002 misses a specifier split from its `from` across lines; Prettier never writes the last two, and `next build` catches the boundary errors.
+  - UI001 misses optional chaining and bracket access on a browser global (`window?.innerWidth`, `window["innerWidth"]`): matching them without new false hits needs a parser, and the server render throws on them.
   - UI002 reads only `dependencies` and `devDependencies` and does not resolve npm aliases (`"x": "npm:framer-motion@11"`); an alias is a deliberate choice, not the default the rule exists to stop.
   - `.mdx` files are not scanned: their fenced code samples would be flagged, and the components they import are scanned.
   - Symlinked sources are skipped: following them risks loops and reads outside the root.

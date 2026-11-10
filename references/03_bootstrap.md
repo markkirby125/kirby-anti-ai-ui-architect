@@ -49,8 +49,11 @@ Same snippet with `CLAUDE.md` and `templates/CLAUDE.section.md`. Then, only if `
 
 ```bash
 mkdir -p scripts
-SHA=$(git -C "<skill>" rev-parse --short HEAD 2>/dev/null) || SHA=unknown
-[ -z "$(git -C "<skill>" status --porcelain 2>/dev/null)" ] || SHA=$SHA-dirty
+SHA=unknown
+if [ "$(git -C "<skill>" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "<skill>" && pwd -P)" ]; then
+  SHA=$(git -C "<skill>" rev-parse --short HEAD 2>/dev/null) || SHA=unknown
+  [ -z "$(git -C "<skill>" status --porcelain -- . 2>/dev/null)" ] || SHA=$SHA-dirty
+fi
 NEW=$(mktemp)
 sed "2s/.*/# skill-sha: $SHA/" "<skill>/bin/verify-ui.sh" > "$NEW"
 if [ -f scripts/verify-ui.sh ] && ! cmp -s "$NEW" scripts/verify-ui.sh; then
@@ -61,7 +64,7 @@ else
 fi
 ```
 
-The new copy goes to a temp file first, so an existing, hand-edited `scripts/verify-ui.sh` is never truncated before the user has seen the diff. On a yes, run `cp "$NEW" scripts/verify-ui.sh && chmod +x scripts/verify-ui.sh && rm -f "$NEW"`; on a no, `rm -f "$NEW"`. Line 2 of the script is the `skill-sha` header, so a later diff shows drift (see `04_verify.md`), and re-running after a skill update always asks once.
+The new copy goes to a temp file first, so an existing, hand-edited `scripts/verify-ui.sh` is never truncated before the user has seen the diff. On a yes, run `cp "$NEW" scripts/verify-ui.sh && chmod +x scripts/verify-ui.sh && rm -f "$NEW"`; on a no, `rm -f "$NEW"`. Line 2 of the script is the `skill-sha` header, so a later diff shows drift (see `04_verify.md`), and re-running after a skill update always asks once. The SHA is recorded only when `<skill>` is the top of its own git work tree; a skill dir copied or vendored inside another repo gets `unknown`, never that repo's SHA.
 
 ### 1d. Claude Code Stop hook
 

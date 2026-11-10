@@ -134,7 +134,8 @@ if [ -f "$ROOT/components.json" ]; then
       if (c.tailwind && typeof c.tailwind.css === "string") console.log(c.tailwind.css);
     } catch (e) {}
   ' "$ROOT/components.json")
-  [ -n "$css" ] && [ -f "$ROOT/$css" ] && GLOBAL_CSS=$ROOT/$css
+  case $css in /*) ;; *) css=$ROOT/$css ;; esac
+  [ -f "$css" ] && GLOBAL_CSS=$css
 fi
 if [ -z "$GLOBAL_CSS" ]; then
   for c in "$BASE/app/globals.css" "$BASE/styles/globals.css" "$ROOT/src/app/globals.css" \
