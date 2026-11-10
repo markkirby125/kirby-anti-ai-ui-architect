@@ -1,3 +1,4 @@
 exit=1
 ids=UI003
 args=--skip-tsc
+at=UI003 src/app/build/page.tsx:2

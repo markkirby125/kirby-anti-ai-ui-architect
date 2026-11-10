@@ -2,3 +2,4 @@ exit=1
 ids=UI006
 args=NONE
 output=tsc --noEmit exited 1
+at=UI006 tsconfig.json:1

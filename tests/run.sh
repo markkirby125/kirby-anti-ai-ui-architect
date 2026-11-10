@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Fixture runner for bin/verify-ui.sh.
 # Usage: bash tests/run.sh [case-glob]   (default: all cases)
-# Env:   VERIFY_UI_BIN overrides the gate path (used to test the runner itself).
+# Env:   VERIFY_UI_BIN overrides the gate path (tests/hooks.sh uses it to test the runner itself).
+# EXPECT: exit=N (required); ids=UI001,... (the set of FAIL IDs); at=UIxxx path:line, one line per FAIL line,
+#         compared exactly and required when exit=1 and ids= is not empty; optional args=, arg=, output=.
 # Exit:  0 all selected cases pass, 1 any case fails, 2 runner error.
 set -u
 
@@ -46,8 +48,16 @@ for dir in "$FIXTURES"/$PATTERN/; do
   raw_args="$(sed -n 's/^args=//p' "$expect_file" | head -n 1)"
   # Optional: text the gate output (stdout and stderr) must contain, for stderr notes and usage text.
   exp_out="$(sed -n 's/^output=//p' "$expect_file" | head -n 1)"
+  # at= lines: one "UIxxx path:line" per expected FAIL line, compared exactly (order-insensitive, duplicates count).
+  exp_at="$(sed -n 's/^at=//p' "$expect_file" | LC_ALL=C sort | paste -sd';' -)"
   if [ -z "$exp_exit" ]; then
     echo "ERROR $case_name: EXPECT has no exit= line"
+    errors=$((errors + 1))
+    continue
+  fi
+  # A findings case must pin where each finding is, or a finding on the wrong line would still pass.
+  if [ "$exp_exit" = 1 ] && [ -n "$exp_ids" ] && [ -z "$exp_at" ]; then
+    echo "ERROR $case_name: EXPECT has ids= but no at= lines"
     errors=$((errors + 1))
     continue
   fi
@@ -77,13 +87,15 @@ for dir in "$FIXTURES"/$PATTERN/; do
   out="$(cd "$work" && bash "$GATE" --root "$work" ${args[@]+"${args[@]}"} 2>&1)"
   code=$?
   act_ids="$(printf '%s\n' "$out" | grep -oE '^FAIL UI[0-9]+' | awk '{print $2}' | sort -u | paste -sd, -)"
+  # "FAIL UIxxx <path>:<line>: <message>" -> "UIxxx <path>:<line>"; the first ":<digits>: " ends the location (paths may hold spaces).
+  act_at="$(printf '%s\n' "$out" | awk '/^FAIL UI[0-9]+ / { if (match($0, /:[0-9]+: /)) print substr($0, 6, RSTART + RLENGTH - 8); else print "UNPARSED " $0 }' | LC_ALL=C sort | paste -sd';' -)"
 
-  if [ "$code" = "$exp_exit" ] && [ "$act_ids" = "$exp_ids" ] \
+  if [ "$code" = "$exp_exit" ] && [ "$act_ids" = "$exp_ids" ] && [ "$act_at" = "$exp_at" ] \
      && { [ -z "$exp_out" ] || printf '%s\n' "$out" | grep -qF -- "$exp_out"; }; then
     echo "PASS $case_name"
     passed=$((passed + 1))
   else
-    echo "FAIL $case_name: expected exit=$exp_exit ids=[$exp_ids]${exp_out:+ output~[$exp_out]}, got exit=$code ids=[$act_ids]"
+    echo "FAIL $case_name: expected exit=$exp_exit ids=[$exp_ids] at=[$exp_at]${exp_out:+ output~[$exp_out]}, got exit=$code ids=[$act_ids] at=[$act_at]"
     printf '%s\n' "$out" | head -n 10 | sed 's/^/    | /'
     failed=$((failed + 1))
   fi

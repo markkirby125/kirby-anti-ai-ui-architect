@@ -1,3 +1,4 @@
 exit=1
 ids=UI005
 args=--skip-tsc
+at=UI005 src/styles/globals.css:4

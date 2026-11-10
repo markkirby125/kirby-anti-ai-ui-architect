@@ -3,3 +3,4 @@ ids=UI003
 arg=--skip-tsc
 arg=--dirs
 arg=src/components extra
+at=UI003 extra/x.tsx:2

@@ -1,3 +1,7 @@
 exit=1
 ids=UI007
 args=--skip-tsc
+at=UI007 src/app/globals.css:11
+at=UI007 src/app/globals.css:12
+at=UI007 src/app/globals.css:13
+at=UI007 src/app/globals.css:14

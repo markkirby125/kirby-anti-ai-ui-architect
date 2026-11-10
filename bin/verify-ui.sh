@@ -194,6 +194,8 @@ fail() {
 
 Q="['\"]"
 B='(^|[^A-Za-z0-9_$])'
+# Browser globals only: a name after "." is a member of another object (obj.matchMedia, this.navigator), except after a spread or globalThis.
+BG='(^|[^A-Za-z0-9_$.]|\.\.\.|globalThis\.)'
 
 # ---------- UI001 ----------
 HOOKS='useState|useEffect|useLayoutEffect|useReducer|useRef|useContext|useTransition|useOptimistic|useActionState|useAnimate|useInView|useScroll|useSpring|useTransform|useMotionValue|useReducedMotion|useTheme|useRouter|usePathname|useSearchParams|useParams|useSelectedLayoutSegments?|useSyncExternalStore|useImperativeHandle|useDeferredValue|useInsertionEffect|useFormStatus|createContext'
@@ -203,7 +205,7 @@ TOAST_RE="${B}toast(\\.[A-Za-z]+)?[[:space:]]*\\("
 TOAST_DEF_RE="(function|const|let|var)[[:space:]]+toast[[:space:]]*[(=:]"
 LIBIMPORT_RE="(from|import)[[:space:]]*${Q}(motion/react|vaul|cmdk|@number-flow/react|next-themes)${Q}"
 # "document. Then" is prose; a property access needs a name after the dot. matchMedia counts only as a call.
-BROWSER_RE="${B}(window|document|navigator)\\.[A-Za-z_\$]|${B}(localStorage|sessionStorage)([^A-Za-z0-9_\$]|\$)|${B}matchMedia[[:space:]]*\\("
+BROWSER_RE="${BG}(window|document|navigator)\\.[A-Za-z_\$]|${BG}(localStorage|sessionStorage)([^A-Za-z0-9_\$]|\$)|${BG}matchMedia[[:space:]]*\\("
 ONPROP_RE="[[:space:]]on[A-Z][A-Za-z0-9]*=\\{"
 # A one-line <Component onX={name}> passes a server action or plain data; only an arrow or function value is client-only.
 # shortcut: tags split over several lines are still flagged; use the pragma for those.

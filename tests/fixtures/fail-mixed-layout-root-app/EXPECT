@@ -1,3 +1,5 @@
 exit=1
 ids=UI002,UI003
 args=--skip-tsc
+at=UI002 app/page.tsx:1
+at=UI003 app/page.tsx:4

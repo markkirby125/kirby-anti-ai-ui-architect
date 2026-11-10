@@ -1,3 +1,4 @@
 exit=1
 ids=UI002
 args=--skip-tsc
+at=UI002 package.json:5

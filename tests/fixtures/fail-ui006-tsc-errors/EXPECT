@@ -2,3 +2,4 @@ exit=1
 ids=UI006
 args=NONE
 output=src/app/page.tsx:2
+at=UI006 src/app/page.tsx:2

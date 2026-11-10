@@ -1,3 +1,5 @@
 exit=1
 ids=UI003
 args=--skip-tsc
+at=UI003 src/components/site-header.tsx:3
+at=UI003 src/components/site-header.tsx:5

@@ -1,3 +1,4 @@
 exit=1
 ids=UI003
 args=--skip-tsc --root -lead
+at=UI003 src/components/p.tsx:2

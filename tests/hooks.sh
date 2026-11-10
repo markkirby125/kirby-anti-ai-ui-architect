@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Checks for the parts of the skill that tests/run.sh cannot reach: the bootstrap snippets in
-# references/03_bootstrap.md (1c SHA header, 1e core.hooksPath) and templates/githooks/pre-push.
+# references/03_bootstrap.md (1c SHA header, 1e core.hooksPath), templates/githooks/pre-push, the Stop hook in
+# templates/claude-settings.stop-hook.json, and the at= checks of tests/run.sh itself.
 # The snippets are extracted from the doc and run as written, in throwaway repos under a temp dir.
 # Usage: bash tests/hooks.sh        Exit: 0 all pass, 1 any fail.
 set -u
@@ -74,6 +75,57 @@ if [ "$rc" -eq 1 ] && grep -q 'Fix the findings' "$T/pp1.err"; then
 else
   bad "pre-push-exit1-message" "rc=$rc stderr=$(cat "$T/pp1.err")"
 fi
+
+# ---- Stop hook: exit 2 only for gate findings (exit 1); stop_hook_active, env errors and no gate pass ----
+cmd="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).hooks.Stop[0].hooks[0].command)' "$S/templates/claude-settings.stop-hook.json")"
+P="$T/proj5"
+mkdir -p "$P/scripts" "$T/proj6"
+cat > "$P/scripts/verify-ui.sh" <<'EOF'
+echo "$*" > gate-args
+echo "FAIL UI001 src/x.ts:1: stub finding"
+exit "${STUB_RC:-0}"
+EOF
+# hook DIR STUB_RC PAYLOAD: runs the command from another dir under bash and sh (dash on Debian); prints "bash:RC sh:RC ".
+hook() {
+  for sh in bash sh; do
+    rm -f "$1/gate-args"
+    (cd "$T" && printf '%s' "$3" | STUB_RC=$2 CLAUDE_PROJECT_DIR="$1" "$sh" -c "$cmd" >/dev/null 2>"$T/stop-$sh.err")
+    printf '%s:%s ' "$sh" "$?"
+  done
+}
+r="$(hook "$P" 1 '{"session_id":"s","stop_hook_active":true}')"
+if [ "$r" = "bash:0 sh:0 " ] && [ ! -f "$P/gate-args" ]; then ok "stop-hook-active-skips-gate"; else bad "stop-hook-active-skips-gate" "$r"; fi
+r="$(hook "$P" 1 '{"session_id":"s","stop_hook_active":false}')"
+if [ "$r" = "bash:2 sh:2 " ] && grep -qF 'FAIL UI001 src/x.ts:1: stub finding' "$T/stop-bash.err" && grep -qF 'FAIL UI001 src/x.ts:1: stub finding' "$T/stop-sh.err"; then
+  ok "stop-hook-findings-exit2"
+else
+  bad "stop-hook-findings-exit2" "$r stderr=$(cat "$T/stop-sh.err")"
+fi
+r="$(hook "$P" 2 '{"stop_hook_active":false}')"
+if [ "$r" = "bash:0 sh:0 " ]; then ok "stop-hook-env-error-passes"; else bad "stop-hook-env-error-passes" "$r"; fi
+r="$(hook "$P" 0 '{"stop_hook_active":false}')"
+if [ "$r" = "bash:0 sh:0 " ] && [ "$(cat "$P/gate-args" 2>/dev/null)" = "--skip-tsc" ]; then ok "stop-hook-clean-skip-tsc"; else bad "stop-hook-clean-skip-tsc" "$r args=[$(cat "$P/gate-args" 2>/dev/null)]"; fi
+r="$(hook "$T/proj6" 1 '{"stop_hook_active":false}')"
+if [ "$r" = "bash:0 sh:0 " ]; then ok "stop-hook-no-gate"; else bad "stop-hook-no-gate" "$r"; fi
+
+# ---- tests/run.sh: at= lines pin the path and line of each finding ----
+# A copy of the runner reads the fixtures beside it, so the cases live in the temp dir. The fake gate prints $T/gate.out.
+R="$T/runner"
+mkdir -p "$R/tests/fixtures/pinned/project" "$R/tests/fixtures/unpinned/project"
+cp "$S/tests/run.sh" "$R/tests/run.sh"
+printf 'exit=1\nids=UI001\nat=UI001 src/my card.tsx:4\n' > "$R/tests/fixtures/pinned/EXPECT"
+printf 'exit=1\nids=UI001\n' > "$R/tests/fixtures/unpinned/EXPECT"
+printf '#!/usr/bin/env bash\ncat "%s"\nexit 1\n' "$T/gate.out" > "$T/fake-gate.sh"
+# runner CASE GATE-OUTPUT: runs the copied runner on one case; sets rc, output in $T/runner.out.
+runner() { printf '%s\n' "$2" > "$T/gate.out"; VERIFY_UI_BIN="$T/fake-gate.sh" bash "$R/tests/run.sh" "$1" > "$T/runner.out" 2>&1; rc=$?; }
+runner pinned 'FAIL UI001 src/my card.tsx:4: msg'
+if [ "$rc" -eq 0 ]; then ok "runner-at-match"; else bad "runner-at-match" "rc=$rc $(head -n 1 "$T/runner.out")"; fi
+runner pinned 'FAIL UI001 src/my card.tsx:5: msg'
+if [ "$rc" -eq 1 ] && grep -q '^FAIL pinned' "$T/runner.out"; then ok "runner-at-wrong-line"; else bad "runner-at-wrong-line" "rc=$rc"; fi
+runner pinned "$(printf 'FAIL UI001 src/my card.tsx:4: msg\nFAIL UI001 src/card.tsx:4: msg')"
+if [ "$rc" -eq 1 ] && grep -q '^FAIL pinned' "$T/runner.out"; then ok "runner-at-extra-path"; else bad "runner-at-extra-path" "rc=$rc"; fi
+runner unpinned 'FAIL UI001 src/x.ts:1: msg'
+if [ "$rc" -eq 2 ] && grep -q '^ERROR unpinned' "$T/runner.out"; then ok "runner-at-required"; else bad "runner-at-required" "rc=$rc"; fi
 
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ]

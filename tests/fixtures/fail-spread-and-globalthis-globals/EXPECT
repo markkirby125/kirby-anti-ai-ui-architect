@@ -1,0 +1,5 @@
+exit=1
+ids=UI001
+args=--skip-tsc
+at=UI001 src/lib/frames.ts:1
+at=UI001 src/lib/store.ts:1
