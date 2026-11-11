@@ -158,5 +158,35 @@ if [ "$rc" -eq 1 ] && grep -q '^FAIL pinned' "$T/runner.out"; then ok "runner-at
 runner unpinned 'FAIL UI001 src/x.ts:1: msg'
 if [ "$rc" -eq 2 ] && grep -q '^ERROR unpinned' "$T/runner.out"; then ok "runner-at-required"; else bad "runner-at-required" "rc=$rc"; fi
 
+
+# ---- tests/run.sh: noutput= fails the case when the forbidden text appears, and is validated ----
+mkdir -p "$R/tests/fixtures/nout/project" "$R/tests/fixtures/nout-empty/project"
+printf 'exit=1\nids=UI001\nat=UI001 a.ts:1\nnoutput=FORBIDDEN\n' > "$R/tests/fixtures/nout/EXPECT"
+printf 'exit=1\nids=UI001\nat=UI001 a.ts:1\nnoutput=\n' > "$R/tests/fixtures/nout-empty/EXPECT"
+runner nout "$(printf 'FAIL UI001 a.ts:1: msg\nFORBIDDEN text')"
+if [ "$rc" -eq 1 ] && grep -q '^FAIL nout' "$T/runner.out"; then ok "runner-noutput-present-fails"; else bad "runner-noutput-present-fails" "rc=$rc"; fi
+runner nout 'FAIL UI001 a.ts:1: msg'
+if [ "$rc" -eq 0 ]; then ok "runner-noutput-absent-passes"; else bad "runner-noutput-absent-passes" "rc=$rc"; fi
+runner nout-empty 'FAIL UI001 a.ts:1: msg'
+if [ "$rc" -eq 2 ] && grep -q '^ERROR nout-empty' "$T/runner.out"; then ok "runner-noutput-empty-errors"; else bad "runner-noutput-empty-errors" "rc=$rc"; fi
+
+# ---- gate: -h piped to bash (no script file) prints the usage line and a note, never a file named bash ----
+G="$S/bin/verify-ui.sh"
+mkdir -p "$T/pipecwd"
+( cd "$T/pipecwd" && bash -s -- -h < "$G" ) > "$T/pipe.out" 2>&1; rc=$?
+want="$(sed -n '/^# Usage:/{s/^# //p;q}' "$G")"
+if [ "$rc" -eq 0 ] && [ "$(head -n 1 "$T/pipe.out")" = "$want" ] && grep -qF 'run the script from a file' "$T/pipe.out" && ! grep -qF 'Output: "FAIL' "$T/pipe.out"; then
+  ok "gate-help-piped"
+else
+  bad "gate-help-piped" "rc=$rc first=[$(head -n 1 "$T/pipe.out")] want=[$want]"
+fi
+printf 'TRAP from ./bash\n' > "$T/pipecwd/bash"
+( cd "$T/pipecwd" && bash -s -- -h < "$G" ) > "$T/pipe2.out" 2>&1; rc=$?
+if [ "$rc" -eq 0 ] && ! grep -q TRAP "$T/pipe2.out" && grep -qF 'run the script from a file' "$T/pipe2.out"; then
+  ok "gate-help-piped-ignores-file-named-bash"
+else
+  bad "gate-help-piped-ignores-file-named-bash" "rc=$rc $(head -n 1 "$T/pipe2.out")"
+fi
+
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ]

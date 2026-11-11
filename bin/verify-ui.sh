@@ -46,7 +46,8 @@ set -u
 # Prints the header from "# Usage:" up to (not including) "# Output:": usage, exit codes and the check list.
 # Piped to bash (bash -s -- -h < verify-ui.sh) there is no script file to read back, so print the first usage line only.
 usage() {
-  if [ -f "${BASH_SOURCE[0]:-}" ]; then
+  # Piped, BASH_SOURCE[0] is just "bash"; a file of that name in the current directory must not be read as help, so check it is this script.
+  if [ -f "${BASH_SOURCE[0]:-}" ] && grep -q '^# verify-ui.sh: ' "${BASH_SOURCE[0]}"; then
     awk '/^# Usage:/ { p = 1 } p && /^# Output:/ { exit } p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   else
     echo 'Usage: bash verify-ui.sh [--root DIR] [--skip-tsc] [--dirs "a b"]'

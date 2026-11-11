@@ -50,6 +50,12 @@ for dir in "$FIXTURES"/$PATTERN/; do
   exp_out="$(sed -n 's/^output=//p' "$expect_file" | head -n 1)"
   # Optional: text the gate output must NOT contain (pins where usage text stops, for example).
   exp_nout="$(sed -n 's/^noutput=//p' "$expect_file" | head -n 1)"
+  # One noutput= line only, and never empty: an empty value would silently disable the check.
+  if [ "$(grep -c '^noutput=' "$expect_file")" -gt 1 ] || grep -q '^noutput=$' "$expect_file"; then
+    echo "ERROR $case_name: EXPECT needs exactly one non-empty noutput= line"
+    errors=$((errors + 1))
+    continue
+  fi
   # at= lines: one "UIxxx path:line" per expected FAIL line, compared exactly (order-insensitive, duplicates count).
   exp_at="$(sed -n 's/^at=//p' "$expect_file" | LC_ALL=C sort | paste -sd';' -)"
   if [ -z "$exp_exit" ]; then
