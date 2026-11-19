@@ -55,6 +55,7 @@ Never paste HSL into a v4 project or `oklch` into a v3 one. Read the values shad
 ## Guidance rules (not machine-checked)
 
 - One standout per page: one hero treatment, one accent. Everything else is quiet.
+- Primary content sits in `<main>` and starts in the first viewport; hero decoration must not push it below the fold (house guardrail).
 - Palette ratio about 60 neutral, 30 secondary, 10 accent.
 - Two type families at most, with a clear scale. No gradient text on body copy.
 - Spacing on a scale (4px base). No nested cards, no uniform rounded-everything.
