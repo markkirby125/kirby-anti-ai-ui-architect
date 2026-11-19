@@ -10,6 +10,7 @@ Do not ship generic AI-looking UI. The gate is `bash scripts/verify-ui.sh`; run 
 - Reduced motion: any animation needs a global `prefers-reduced-motion` handle, and `requestAnimationFrame` or `<canvas` files need their own guard.
 - Tokens: Tailwind v3 uses HSL triplets plus `tailwind.config.ts`; Tailwind v4 uses `oklch(...)` plus `@theme inline` in `globals.css`. Detect the version first.
 - Components: use shadcn (`sonner`, `drawer`, `command`) before hand-rolling. Run `npx shadcn@latest view <item>` before `add`, then the gate after.
+- Layout: primary content sits in `<main>` and starts in the first viewport; hero decoration must not push it below the fold (house guardrail, not machine-checked).
 - Install one package at a time with the project's package manager. No bulk installs.
 - A false positive gets `// verify-ui-ignore UI00N` with a reason. Never use it to hide a real violation.
 - `next build` is the authority for client boundaries.
