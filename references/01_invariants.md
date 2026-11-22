@@ -55,12 +55,13 @@ Never paste HSL into a v4 project or `oklch` into a v3 one. Read the values shad
 ## Guidance rules (not machine-checked)
 
 - One standout per page: one hero treatment, one accent. Everything else is quiet.
-- Primary content sits in `<main>` and starts in the first viewport; hero decoration must not push it below the fold (house guardrail).
+- Primary content sits in `<main>` and starts in the first viewport; hero decoration must not push it below the fold (house guardrail — **Visual Semantics & Centerpiece Above-the-Fold Invariant**: the primary tool, calculator, interactive visual, video, or conversion CTA occupies Viewport 1 without deceptive layout imitation).
 - Palette ratio about 60 neutral, 30 secondary, 10 accent.
 - Two type families at most, with a clear scale. No gradient text on body copy.
 - Spacing on a scale (4px base). No nested cards, no uniform rounded-everything.
 - Motion has a reason: it shows state change or hierarchy. Decoration loops are cut.
 - Real content states: empty, loading, error. No lorem ipsum, no stock gradient blobs.
+- **Craftsmanship & Visual Typography Quality Checklist (Mike Hawley UI Quality Bar):** Strictly for visual quality and authenticity (never de-fingerprinting): ban decorative em-dashes (`—`) in UI headings and card labels, avoid uniform rounded pill-card grids repeated mechanically across every band, reject generic placeholder copy or stock-photo hero kits (`"10 sites from 1 kit"` lookalike failure), and ban synthetic AI portraits/avatars — substitute real product UI states, custom data visualizations, authentic logos, and verified domain photography. (Service-page vs. blog conversion wireframes stay in [`kirby-text-first-cro`](../../kirby-text-first-cro/SKILL.md) §21.)
 - Critique and polish: use `impeccable` (separate skill). Contrast ratios: `kirby-accessible-contrast`.
 
 ## What this skill never does

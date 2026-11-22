@@ -1,6 +1,6 @@
 # Anti-AI UI Architect: Dispatcher
 
-Keeps coding agents from shipping generic, AI-looking UI in Next.js + React + shadcn/ui projects. It holds the design invariants, a component routing matrix, the steps to install those rules into a target project, and a deterministic gate script (`bin/verify-ui.sh`, copied to `<target>/scripts/verify-ui.sh`).
+Keeps coding agents from shipping generic, AI-looking UI in Next.js + React + shadcn/ui projects. It holds the design invariants (including the **Visual Semantics & Centerpiece Above-the-Fold Invariant** and **Craftsmanship & Visual Typography Quality Checklist** in `01_invariants.md`), a component routing matrix, the steps to install those rules into a target project, and a deterministic gate script (`bin/verify-ui.sh`, copied to `<target>/scripts/verify-ui.sh`) plus the **SSR HTML Crawler Exposure Check** in `04_verify.md`. For static service-page vs. blog conversion wireframes see [`kirby-text-first-cro`](../../kirby-text-first-cro/SKILL.md) §21; for SSR utility link-magnet microsite builds see [`kirby-linkable-microsite-factory`](../../kirby-linkable-microsite-factory/SKILL.md).
 
 Announce use as: `Using kirby-anti-ai-ui-architect to <purpose>`.
 

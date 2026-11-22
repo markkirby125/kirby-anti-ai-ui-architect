@@ -81,3 +81,7 @@ If they differ, say so and offer to update the copy (an approval-gated write). T
 ## Output of verify mode
 
 The final gate result (exit code and the violation list, or "0 violations"), the list of fixes made, anything pragma'd with the reason, and any copy drift found.
+
+## SSR HTML Crawler Exposure Check
+
+Before sign-off on interactive Next.js + React + shadcn/ui tools, calculators, or landing pages, verify in the server-rendered HTML response (`curl` / view-source, JavaScript disabled) that primary `<h1>`/`<h2>` headings, core copy, specification tables, and internal links exist cleanly in SSR DOM for `Googlebot` and AI retrieval crawlers rather than being gated solely behind client-side hydration.
